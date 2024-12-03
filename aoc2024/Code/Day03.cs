@@ -1,14 +1,25 @@
 namespace aoc2024.Code;
 
-internal class Day03 : BaseDay
+internal partial class Day03 : BaseDay
 {
-    protected override object Part1()
-    {
-        throw new NotImplementedException();
-    }
+    const string DO = "do()";
+    const string DONT = "don't()";
 
-    protected override object Part2()
-    {
-        throw new NotImplementedException();
-    }
+    [GeneratedRegex(@"mul\((\d+),(\d+)\)")]
+    private static partial Regex MulRegex();
+
+    static long Scan(string line) => MulRegex()
+        .Matches(line)
+        .Sum(x => long.Parse(x.Groups[1].Value) * long.Parse(x.Groups[2].Value));
+
+    protected override object Part1() => Scan(ReadAllText());
+
+    protected override object Part2() => (DO + ReadAllText())
+        .Replace("\n", "")
+        .Replace("\r", "")
+        .Replace(DO, $"{Environment.NewLine}{DO}")
+        .Replace(DONT, $"{Environment.NewLine}{DONT}")
+        .Split(Environment.NewLine)
+        .Where(x => x.StartsWith(DO))
+        .Sum(Scan);
 }
