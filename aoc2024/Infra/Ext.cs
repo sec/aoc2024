@@ -1,4 +1,4 @@
-﻿namespace aoc2024.Infra;
+namespace aoc2024.Infra;
 
 internal static class Ext
 {
