@@ -52,4 +52,29 @@ internal static class Ext
             }
         }
     }
+
+    internal static List<List<T>> GetCombinationsWithRepetition<T>(this IEnumerable<T> items, int length)
+    {
+        var combinations = new List<List<T>>();
+        GenerateCombinations(items, length, [], combinations);
+
+        return combinations;
+    }
+
+    internal static void GenerateCombinations<T>(this IEnumerable<T> items, int length, List<T> current, List<List<T>> combinations)
+    {
+        if (current.Count == length)
+        {
+            combinations.Add(new List<T>(current));
+
+            return;
+        }
+
+        foreach (T item in items)
+        {
+            current.Add(item);
+            GenerateCombinations(items, length, current, combinations);
+            current.RemoveAt(current.Count - 1);
+        }
+    }
 }
