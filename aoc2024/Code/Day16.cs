@@ -95,7 +95,7 @@ internal class Day16 : BaseDay
                 var dontAdd = false;
                 foreach (var (Element, Priority) in fringe.UnorderedItems)
                 {
-                    if (Element.Visited.Contains(newPos) && Priority < newCost)
+                    if (Priority < newCost && Element.Visited.Contains(newPos))
                     {
                         dontAdd = true;
                         break;
