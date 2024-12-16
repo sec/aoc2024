@@ -5,8 +5,7 @@ internal class Day16 : BaseDay
     enum Dir { N, S, W, E };
 
     record XY(int X, int Y);
-    record State(XY Pos, Dir Where);
-    record Path(HashSet<State> Visited, State Last);
+    record Path(HashSet<XY> Visited, XY LastPos, Dir LastDir);
 
     int Walk(bool returnCost)
     {
@@ -36,14 +35,11 @@ internal class Day16 : BaseDay
             }
         }
 
-
         var minCost = -1;
         var totalCount = new HashSet<XY>();
 
         var fringe = new PriorityQueue<Path, int>();
-        var startState = new State(start, Dir.E);
-        var starter = new Path(new HashSet<State>([startState]), startState);
-
+        var starter = new Path(new HashSet<XY>([start]), start, Dir.E);
         fringe.Enqueue(starter, 0);
 
         while (fringe.TryDequeue(out var path, out var cost))
@@ -53,8 +49,7 @@ internal class Day16 : BaseDay
                 continue;
             }
 
-            var last = path.Last;
-            if (last.Pos == end)
+            if (path.LastPos == end)
             {
                 minCost = cost;
 
@@ -65,46 +60,18 @@ internal class Day16 : BaseDay
 
                 foreach (var v in path.Visited)
                 {
-                    totalCount.Add(v.Pos);
+                    totalCount.Add(v);
                 }
                 continue;
             }
 
-            var forward = Vector(last.Where);
-            if (map[forward.Y + last.Pos.Y, forward.X + last.Pos.X] == '.')
-            {
-                var newState = new State(new(forward.X + last.Pos.X, forward.Y + last.Pos.Y), last.Where);
-                if (!path.Visited.Contains(newState))
-                {
-                    var newCost = cost + 1;
-
-                    var dontAdd = false;
-                    foreach (var (Element, Priority) in fringe.UnorderedItems)
-                    {
-                        if (Element.Visited.Contains(newState) && Priority < newCost)
-                        {
-                            dontAdd = true;
-                            break;
-                        }
-                    }
-
-                    if (!dontAdd)
-                    {
-                        var newPath = path.Visited.ToHashSet();
-                        newPath.Add(newState);
-
-                        fringe.Enqueue(new Path(newPath, newState), newCost);
-                    }
-                }
-            }
-
-            var moves = new List<Dir>();
-            if (last.Where is Dir.N or Dir.S)
+            var moves = new List<Dir>() { path.LastDir };
+            if (path.LastDir is Dir.N or Dir.S)
             {
                 moves.Add(Dir.W);
                 moves.Add(Dir.E);
             }
-            else if (last.Where is Dir.W or Dir.E)
+            else
             {
                 moves.Add(Dir.N);
                 moves.Add(Dir.S);
@@ -112,33 +79,37 @@ internal class Day16 : BaseDay
 
             foreach (var move in moves)
             {
-                var newState = new State(last.Pos, move);
-                if (path.Visited.Contains(newState))
+                var vector = Vector(move);
+                var newPos = new XY(path.LastPos.X + vector.X, path.LastPos.Y + vector.Y);
+                if (map[newPos.Y, newPos.X] != '.')
+                {
+                    continue;
+                }
+                if (path.Visited.Contains(newPos))
                 {
                     continue;
                 }
 
-                var newCost = cost + 1000;
+                var newCost = cost + (move == path.LastDir ? 1 : 1001);
 
                 var dontAdd = false;
                 foreach (var (Element, Priority) in fringe.UnorderedItems)
                 {
-                    if (Element.Visited.Contains(newState) && Priority < newCost)
+                    if (Element.Visited.Contains(newPos) && Priority < newCost)
                     {
                         dontAdd = true;
                         break;
                     }
                 }
-
                 if (dontAdd)
                 {
                     continue;
                 }
 
                 var newPath = path.Visited.ToHashSet();
-                newPath.Add(newState);
+                newPath.Add(newPos);
 
-                fringe.Enqueue(new Path(newPath, newState), newCost);
+                fringe.Enqueue(new Path(newPath, newPos, move), newCost);
             }
         }
 
