@@ -4,6 +4,8 @@ internal class Day21 : BaseDay
 {
     record XY(int X, int Y);
 
+    static readonly Dictionary<(string, int), long> _codeCache = [];
+
     static readonly char[,] _keypad = {
         { '7', '8', '9' },
         { '4', '5', '6' },
@@ -26,185 +28,81 @@ internal class Day21 : BaseDay
 
     static readonly Dictionary<char, XY> _dirpadMap = new()
     {
-                               { '^', new XY(1, 0) }, { 'A', new XY(2, 0) },
+        { ' ', new XY(0, 0) }, { '^', new XY(1, 0) }, { 'A', new XY(2, 0) },
         { '<', new XY(0, 1) }, { 'v', new XY(1, 1) }, { '>', new XY(2, 1) }
     };
 
-    static readonly Dictionary<(char, char, bool), List<List<char>>> _cache = [];
-
-    static IEnumerable<List<char>> PathAll(char start, char end, char[,] pad, Dictionary<char, XY> map)
+    static IEnumerable<IEnumerable<char>> PathAll(char start, char end, char[,] pad, Dictionary<char, XY> map)
     {
         var width = pad.GetLength(1);
         var height = pad.GetLength(0);
 
-        var dist = new Dictionary<XY, int>();
-        var fringe = new Queue<XY>();
-        fringe.Enqueue(map[start]);
+        var fringe = new Queue<List<XY>>();
+        fringe.Enqueue(new([map[start]]));
 
-        var parent = new Dictionary<XY, List<XY>>
+        while (fringe.TryDequeue(out var path))
         {
-            [map[start]] = []
-        };
-        parent[map[start]].Clear();
-        parent[map[start]].Add(new XY(-1, -1));
-
-        foreach (var kv in map)
-        {
-            dist[kv.Value] = int.MaxValue;
-        }
-
-        dist[map[start]] = 0;
-
-        while (fringe.TryDequeue(out var u))
-        {
-            foreach (var (x, y) in new (int X, int Y)[] { (-1, 0), (1, 0), (0, -1), (0, 1) })
+            if (path.Last() == map[end])
             {
-                var v = new XY(u.X + x, u.Y + y);
-                if (v.X < 0 || v.X >= width || v.Y < 0 || v.Y >= height)
-                {
-                    continue;
-                }
-                if (pad[v.Y, v.X] == ' ')
-                {
-                    continue;
-                }
-
-                if (dist[v] > dist[u] + 1)
-                {
-                    dist[v] = dist[u] + 1;
-                    fringe.Enqueue(v);
-
-                    parent[v] = [];
-                    parent[v].Add(u);
-                }
-                else if (dist[v] == dist[u] + 1)
-                {
-                    parent[v].Add(u);
-                }
-            }
-        }
-
-        var paths = new List<List<XY>>();
-        FindPaths(paths, [], parent, map[end]);
-
-        foreach (var path in paths)
-        {
-            path.Reverse();
-
-            var moves = new List<char>();
-            for (int i = 0; i < path.Count - 1; i++)
-            {
-                var dx = path[i].X - path[i + 1].X;
-                var dy = path[i].Y - path[i + 1].Y;
-                moves.Add(new XY(dx, dy) switch
+                yield return path.Zip(path.Skip(1)).Select(zip => new XY(zip.First.X - zip.Second.X, zip.First.Y - zip.Second.Y) switch
                 {
                     (-1, 0) => '>',
                     (1, 0) => '<',
                     (0, -1) => 'v',
                     (0, 1) => '^',
                     _ => throw new NotImplementedException()
-                });
+                }).Concat(['A']);
             }
-            moves.Add('A');
 
-            yield return moves;
+            foreach (var (x, y) in new (int X, int Y)[] { (-1, 0), (1, 0), (0, -1), (0, 1) })
+            {
+                var u = path.Last();
+                var v = new XY(u.X + x, u.Y + y);
+                if (v.X < 0 || v.X >= width || v.Y < 0 || v.Y >= height || pad[v.Y, v.X] == ' ' || path.Contains(v))
+                {
+                    continue;
+                }
+                fringe.Enqueue([.. path, v]);
+            }
         }
     }
 
-    static void FindPaths(List<List<XY>> paths, List<XY> path, Dictionary<XY, List<XY>> parent, XY u)
+    static long EnterCode(string code, bool useKeypad, int level)
     {
-        if (u == new XY(-1, -1))
-        {
-            paths.Add(new List<XY>(path));
+        code = 'A' + code;
 
-            return;
+        if (!useKeypad && _codeCache.TryGetValue((code, level), out var total))
+        {
+            return total;
         }
 
-        foreach (var par in parent[u])
-        {
-            path.Add(u);
-
-            FindPaths(paths, path, parent, par);
-
-            path.RemoveAt(path.Count - 1);
-        }
-    }
-
-    static IEnumerable<string> FindSequence(string code, bool useKeypad)
-    {
         var pad = useKeypad ? _keypad : _dirpad;
         var map = useKeypad ? _keypadMap : _dirpadMap;
 
-        var paths = new List<List<char>>();
-        code = 'A' + code;
-        for (int i = 0; i < code.Length - 1; i++)
+        total = 0L;
+
+        foreach (var (from, to) in code.Zip(code.Skip(1)))
         {
-            if (!_cache.TryGetValue((code[i], code[i + 1], useKeypad), out var nextPaths))
-            {
-                nextPaths = PathAll(code[i], code[i + 1], pad, map).ToList();
+            var paths = PathAll(from, to, pad, map);
 
-                _cache[(code[i], code[i + 1], useKeypad)] = nextPaths;
-            }
-
-            if (paths.Count == 0)
+            if (level < 1)
             {
-                paths = nextPaths;
+                total += paths.Select(c => c.Count()).Min();
             }
             else
             {
-                paths = (from a in paths
-                         from b in nextPaths
-                         select a.Concat(b).ToList()).ToList();
+                total += paths.Select(p => EnterCode(string.Join("", p), false, level - 1)).Min();
             }
         }
 
-        return paths.Select(s => string.Join("", s));
+        _codeCache[(code, level)] = total;
+
+        return total;
     }
 
-    static int EnterCode(string code, int n)
-    {
-        var min = int.MaxValue;
-        foreach (var s1 in FindSequence(code, true))
-        {
-            var findMin = FindMin(s1, n);
+    long EnterCode(int level) => ReadAllLines(true).Select(code => EnterCode(code, true, level) * int.Parse(code[..3])).Sum();
 
-            min = Math.Min(min, findMin);
-        }
+    protected override object Part1() => EnterCode(2);
 
-        return min;
-    }
-
-    private static int FindMin(string s1, int v)
-    {
-        var min = int.MaxValue;
-
-        foreach (var code in FindSequence(s1, false))
-        {
-            if (v <= 1)
-            {
-                min = Math.Min(min, code.Length);
-            }
-            else
-            {
-                min = Math.Min(min, FindMin(code, v - 1));
-            }
-        }
-
-        return min;
-    }
-
-    protected override object Part1()
-    {
-        return ReadAllLines(true)
-            .Select(code => EnterCode(code, 2) * int.Parse(code[..3]))
-            .Sum();
-    }
-
-    protected override object Part2()
-    {
-        //TODO: d21p2
-        return ReadAllLines(true)
-            .Select(code => EnterCode(code, 0) * int.Parse(code[..3]))
-            .Sum();
-    }
+    protected override object Part2() => EnterCode(25);
 }
